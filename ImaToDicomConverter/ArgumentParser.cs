@@ -93,7 +93,13 @@ internal static class ArgumentParser
     private static ConverterConfiguration LoadConfig(string configPath)
     {
         var json = File.ReadAllText(configPath);
-        return JsonSerializer.Deserialize<ConverterConfiguration>(json)
+        var options = new JsonSerializerOptions
+        {
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true,
+            Converters = { new OptionJsonConverterFactory() }
+        };
+        return JsonSerializer.Deserialize<ConverterConfiguration>(json, options)
                ?? throw new Exception("Failed to deserialize config.");
     }
 }

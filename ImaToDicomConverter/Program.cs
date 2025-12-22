@@ -44,7 +44,7 @@ class SomatomArCtConverter
                         .ForEach((file) =>
                         {
                             byte[] pixelData = new SomatomArCtConverter().ReadPixelData(file);
-                            DicomFile fileAsDicom = PixelDataToDicom(pixelData, sliceIndex++, studyUid, seriesUid);
+                            DicomFile fileAsDicom = PixelDataToDicom(pixelData, sliceIndex++, studyUid, seriesUid, parsed.Config);
                             Directory.CreateDirectory(parsed.OutputDirectory);
                             fileAsDicom.Save(Path.Combine(parsed.OutputDirectory, Path.GetFileName(file).Replace(".ima", ".dcm")));
                         });
@@ -88,57 +88,63 @@ class SomatomArCtConverter
         return pixelData;
     }
     
-    private static DicomFile PixelDataToDicom(byte[] pixelData, int sliceIndex, DicomUID studyUid, DicomUID seriesUid)
+    private static DicomFile PixelDataToDicom(byte[] pixelData, int sliceIndex, DicomUID studyUid, DicomUID seriesUid, ConverterConfiguration config)
     {
         EnsureLittleEndianInt16(pixelData);
-        double sliceSpacing = 0.01;
-        double sliceThickness = 3.0;
-        double z = sliceIndex * sliceSpacing;
-        var ds = new DicomDataset(DicomTransferSyntax.ExplicitVRLittleEndian)
-        {
-            // ---- identity ----
-            { DicomTag.SOPClassUID, DicomUID.CTImageStorage },
-            { DicomTag.SOPInstanceUID, DicomUID.Generate() },
-            { DicomTag.StudyInstanceUID, studyUid },
-            { DicomTag.SeriesInstanceUID, seriesUid },
-            { DicomTag.Modality, "CT" },
-            // ---- geometry ----
-            { DicomTag.Rows, (ushort)Height },
-            { DicomTag.Columns, (ushort)Width },
-            // ---- pixel format ----
-            { DicomTag.SamplesPerPixel, (ushort)1 },
-            { DicomTag.PhotometricInterpretation, PhotometricInterpretation.Monochrome2.Value },
-            { DicomTag.BitsAllocated, (ushort)16 },
-            { DicomTag.BitsStored, (ushort)16 },
-            { DicomTag.HighBit, (ushort)15 },
-            { DicomTag.PixelRepresentation, (ushort)1 }, // SIGNED
-            // ---- CT scaling ----
-            { DicomTag.RescaleSlope, 1.0 },
-            { DicomTag.RescaleIntercept, -1024.0 },
-            // { DicomTag.RescaleType, "HU" },
-
-            // ---- Display window (helps viewers) ----
-            { DicomTag.WindowCenter, 2000.0 },
-            { DicomTag.WindowWidth, 4000.0 },
-            { DicomTag.SliceThickness, sliceThickness },
-            { DicomTag.SpacingBetweenSlices, sliceSpacing },
-            
-            { DicomTag.PixelSpacing, 0.48828125, 0.48828125 },
-            
-            
-            // {
-            //     DicomTag.ImageOrientationPatient, new double[]
-            //     {
-            //         1, 0, 0, // row direction
-            //         0, 1, 0 // column direction
-            //     }
-            // },
-            //{ DicomTag.ImagePositionPatient, 0.0, 0.0, z },
-            // { DicomTag.SliceLocation, z },
-            { DicomTag.PixelData, pixelData }
-        };
+        
+        var ds = new DicomDataset(DicomTransferSyntax.ExplicitVRLittleEndian);
+        
+        // ---- identity (hardcoded, not configurable) ----
+        ds.Add(DicomTag.SOPClassUID, DicomUID.CTImageStorage);
+        ds.Add(DicomTag.SOPInstanceUID, DicomUID.Generate());
+        ds.Add(DicomTag.StudyInstanceUID, studyUid);
+        ds.Add(DicomTag.SeriesInstanceUID, seriesUid);
+        
+        // ---- geometry (configurable) ----
+        config.Rows.IfSome(value => ds.Add(DicomTag.Rows, value));
+        config.Columns.IfSome(value => ds.Add(DicomTag.Columns, value));
+        
+        // ---- pixel format (configurable) ----
+        config.SamplesPerPixel.IfSome(value => ds.Add(DicomTag.SamplesPerPixel, value));
+        config.PhotometricInterpretation.IfSome(value => ds.Add(DicomTag.PhotometricInterpretation, value));
+        config.BitsAllocated.IfSome(value => ds.Add(DicomTag.BitsAllocated, value));
+        config.BitsStored.IfSome(value => ds.Add(DicomTag.BitsStored, value));
+        config.HighBit.IfSome(value => ds.Add(DicomTag.HighBit, value));
+        config.PixelRepresentation.IfSome(value => ds.Add(DicomTag.PixelRepresentation, value));
+        
+        // ---- CT scaling (configurable) ----
+        config.RescaleSlope.IfSome(value => ds.Add(DicomTag.RescaleSlope, value));
+        config.RescaleIntercept.IfSome(value => ds.Add(DicomTag.RescaleIntercept, value));
+        
+        // ---- Display window (configurable) ----
+        config.WindowCenter.IfSome(value => ds.Add(DicomTag.WindowCenter, value));
+        config.WindowWidth.IfSome(value => ds.Add(DicomTag.WindowWidth, value));
+        
+        // ---- Spacing (configurable) ----
+        config.SliceThickness.IfSome(value => ds.Add(DicomTag.SliceThickness, value));
+        config.SpacingBetweenSlices.IfSome(value => ds.Add(DicomTag.SpacingBetweenSlices, value));
+        config.PixelSpacing.IfSome(value => ds.Add(DicomTag.PixelSpacing, ParsePixelSpacing(value)));
+        
+        // ---- Modality (configurable) ----
+        config.Modality.IfSome(value => ds.Add(DicomTag.Modality, value));
+        
+        // ---- Pixel data (hardcoded, always required) ----
+        ds.Add(DicomTag.PixelData, pixelData);
         
         return new DicomFile(ds);
+    }
+
+    private static double[] ParsePixelSpacing(string pixelSpacingStr)
+    {
+        var parts = pixelSpacingStr.Split(',');
+        if (parts.Length == 2 && 
+            double.TryParse(parts[0].Trim(), out var row) && 
+            double.TryParse(parts[1].Trim(), out var col))
+        {
+            return new[] { row, col };
+        }
+
+        throw new ArgumentException($"Invalid PixelSpacing format: '{pixelSpacingStr}'. Expected format: '0.48828125,0.48828125'");
     }
     
     static void EnsureLittleEndianInt16(byte[] data)
