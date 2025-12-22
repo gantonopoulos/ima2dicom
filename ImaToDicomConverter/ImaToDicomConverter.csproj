@@ -8,6 +8,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <InternalsVisibleTo Include="ImaToDicomConverter.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="fo-dicom" Version="5.2.5" />
       <PackageReference Include="LanguageExt.Core" Version="4.4.9" />
     </ItemGroup>
