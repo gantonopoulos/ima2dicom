@@ -2,7 +2,8 @@
 
 using FellowOakDicom;
 using FellowOakDicom.Imaging;
-using FellowOakDicom.IO.Buffer;
+using ImaToDicomConverter;
+
 
 class SomatomArCtConverter
 {
@@ -13,27 +14,65 @@ class SomatomArCtConverter
     
     static void Main(string[] args)
     {
-        // Resolve the shell '~' to the actual home directory
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); // on Linux this maps to $HOME
-        var inputPath = Path.Combine(home, "Documents", "314447");
-        var outputPath = Path.Combine(home, "Documents", "314447", "DICOM_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
-
-
-        int sliceIndex = 0;
-        var studyUid = DicomUID.Generate();
-        var seriesUid = DicomUID.Generate();
-        Directory.GetFiles(inputPath, "*.ima")
-            .ToList()
-            .ForEach((file) =>
-            {
-                byte[] pixelData = new SomatomArCtConverter().ReadPixelData(file);
-                DicomFile fileAsDicom = PixelDataToDicom(pixelData, sliceIndex++, studyUid, seriesUid);
-                Directory.CreateDirectory(outputPath);
-                fileAsDicom.Save(Path.Combine(outputPath, Path.GetFileName(file).Replace(".ima", ".dcm")));
-            });
+        // Handle help first, before any parsing
+        if (args.Length == 0 || args.Contains("--help"))
+        {
+            PrintUsage();
+            return;
+        }
         
-       
-        Console.WriteLine("Converted successfully.");
+        ArgumentParser.Parse(args)
+            .Match(
+                parsed =>
+                {
+                    Console.WriteLine($"Input Directory: {parsed.InputDirectory}");
+                    Console.WriteLine($"Output Directory: {parsed.OutputDirectory}");
+                    Console.WriteLine($"Configuration: {System.Text.Json.JsonSerializer.Serialize(parsed.Config)}");
+
+                    // Here you would call the conversion logic using parsed.inputDirectory, parsed.outputDirectory, and parsed.config
+                    // // Resolve the shell '~' to the actual home directory
+                    // var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); // on Linux this maps to $HOME
+                    // var inputPath = Path.Combine(home, "Documents", "314447");
+                    // var outputPath = Path.Combine(home, "Documents", "314447", "DICOM_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                    //
+                    //
+                    int sliceIndex = 0;
+                    var studyUid = DicomUID.Generate();
+                    var seriesUid = DicomUID.Generate();
+                    Directory.GetFiles(parsed.InputDirectory, "*.ima")
+                        .ToList()
+                        .ForEach((file) =>
+                        {
+                            byte[] pixelData = new SomatomArCtConverter().ReadPixelData(file);
+                            DicomFile fileAsDicom = PixelDataToDicom(pixelData, sliceIndex++, studyUid, seriesUid);
+                            Directory.CreateDirectory(parsed.OutputDirectory);
+                            fileAsDicom.Save(Path.Combine(parsed.OutputDirectory, Path.GetFileName(file).Replace(".ima", ".dcm")));
+                        });
+        
+        
+                    Console.WriteLine("Converted successfully.");
+                },
+                error =>
+                {
+                    Console.WriteLine($"Error: {error.Message}");
+                    PrintUsage();
+                }
+            );
+        
+    }
+
+    private static void PrintUsage()
+    {
+        Console.WriteLine(
+            $"Usage: SomatomArCtConverter " +
+            $"{Argument.In.AsCliString()}=<input_directory> " +
+            $"{Argument.Out.AsCliString()}=<output_directory> " +
+            $"{Argument.Config.AsCliString()}=<config_file>");
+        Console.WriteLine("Options:");
+        Console.WriteLine($"  {Argument.In.AsCliString()}     Directory containing .ima files to convert.");
+        Console.WriteLine($"  {Argument.Out.AsCliString()}    Directory to save converted DICOM files.");
+        Console.WriteLine($"  {Argument.Config.AsCliString()}           Path to the configuration file.");
+        Console.WriteLine("  --help             Show this help message.");
     }
     
     private byte[] ReadPixelData(string file)
