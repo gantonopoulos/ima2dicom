@@ -3,10 +3,6 @@
 using FellowOakDicom;
 using FellowOakDicom.Imaging;
 using ImaToDicomConverter;
-using ImaToDicomConverter.Errors;
-using LanguageExt;
-using LanguageExt.Common;
-using static LanguageExt.Prelude;
 
 
 class SomatomArCtConverter
@@ -67,11 +63,15 @@ class SomatomArCtConverter
 
     private static void PrintUsage()
     {
-        Console.WriteLine("Usage: SomatomArCtConverter --in=<input_directory> --out=<output_directory> --config=<config_file>");
+        Console.WriteLine(
+            $"Usage: SomatomArCtConverter " +
+            $"{Argument.In.AsCliString()}=<input_directory> " +
+            $"{Argument.Out.AsCliString()}=<output_directory> " +
+            $"{Argument.Config.AsCliString()}=<config_file>");
         Console.WriteLine("Options:");
-        Console.WriteLine("  --in     Directory containing .ima files to convert.");
-        Console.WriteLine("  --out    Directory to save converted DICOM files.");
-        Console.WriteLine("  --config           Path to the configuration file.");
+        Console.WriteLine($"  {Argument.In.AsCliString()}     Directory containing .ima files to convert.");
+        Console.WriteLine($"  {Argument.Out.AsCliString()}    Directory to save converted DICOM files.");
+        Console.WriteLine($"  {Argument.Config.AsCliString()}           Path to the configuration file.");
         Console.WriteLine("  --help             Show this help message.");
     }
     

@@ -76,7 +76,8 @@ internal static class ArgumentParser
 
     private static Either<Error, ConverterConfiguration> ParseConfig(ArgumentLookUp lookup)
     {
-        return lookup.TryGetValue("config", out var configPath)
+        var argName = Argument.Config.AsString();
+        return lookup.TryGetValue(argName, out var configPath)
             ? File.Exists(configPath)
                 ? Try(() => LoadConfig(configPath))
                     .Match(
@@ -86,7 +87,7 @@ internal static class ArgumentParser
                     )
                 : Left<Error, ConverterConfiguration>(
                     new ArgumentError($"The config file does not exist: {configPath}"))
-            : Left<Error, ConverterConfiguration>(new ArgumentError("Missing required argument: --config"));
+            : Left<Error, ConverterConfiguration>(new ArgumentError($"Missing required argument: {Argument.Config.AsCliString()}"));
     }
 
     private static ConverterConfiguration LoadConfig(string configPath)
