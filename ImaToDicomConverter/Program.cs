@@ -1,7 +1,6 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using FellowOakDicom;
-using FellowOakDicom.Imaging;
 using ImaToDicomConverter;
 
 
@@ -18,6 +17,13 @@ class SomatomArCtConverter
         if (args.Length == 0 || args.Contains("--help"))
         {
             PrintUsage();
+            return;
+        }
+        
+        // Handle config generation
+        if (args.Any(arg => arg.StartsWith($"{Argument.GenerateConfig.AsCliString()}")))
+        {
+            HandleConfigGeneration(args);
             return;
         }
         
@@ -71,8 +77,52 @@ class SomatomArCtConverter
         Console.WriteLine("Options:");
         Console.WriteLine($"  {Argument.In.AsCliString()}     Directory containing .ima files to convert.");
         Console.WriteLine($"  {Argument.Out.AsCliString()}    Directory to save converted DICOM files.");
-        Console.WriteLine($"  {Argument.Config.AsCliString()}           Path to the configuration file.");
+        Console.WriteLine($"  {Argument.Config.AsCliString()} Path to the configuration file.");
+        Console.WriteLine($"  {Argument.GenerateConfig.AsCliString()}[=<output_dir>]  Generate default configuration file. Optional: specify output directory.");
         Console.WriteLine("  --help             Show this help message.");
+    }
+    
+    private static void HandleConfigGeneration(string[] args)
+    {
+        // Parse the --genconf argument to see if a directory was specified
+        var genconfArg = args.FirstOrDefault(arg => arg.StartsWith($"{Argument.GenerateConfig.AsCliString()}"));
+        
+        if (genconfArg == null)
+        {
+            Console.WriteLine("Error: Failed to find --genconf argument.");
+            return;
+        }
+        
+        string? outputDir = null;
+        var parts = genconfArg.Split('=', 2);
+        if (parts.Length == 2)
+        {
+            outputDir = parts[1];
+            
+            // Validate the directory exists
+            if (!Directory.Exists(outputDir))
+            {
+                Console.WriteLine($"Error: Directory does not exist: {outputDir}");
+                return;
+            }
+        }
+        
+        // Generate the config file
+        ConfigGenerator.GenerateDefaultConfig(outputDir)
+            .Match(
+                path =>
+                {
+                    Console.WriteLine($"Successfully generated default configuration file:");
+                    Console.WriteLine($"  {path}");
+                    Console.WriteLine();
+                    Console.WriteLine("You can now edit this file and use it with:");
+                    Console.WriteLine($"  {Argument.Config.AsCliString()}={path}");
+                },
+                error =>
+                {
+                    Console.WriteLine($"Error generating configuration file: {error.Message}");
+                }
+            );
     }
     
     private byte[] ReadPixelData(string file)
