@@ -1,0 +1,154 @@
+name: Build, Test, and Release
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+        dotnet-quality: 'preview'
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+      
+    - name: Test
+      run: dotnet test --configuration Release --no-build --verbosity normal
+
+  publish-release:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+        dotnet-quality: 'preview'
+        
+    - name: Get version
+      id: version
+      run: |
+        # Generate version from date and short SHA
+        VERSION="v$(date +'%Y.%m.%d')-${GITHUB_SHA::7}"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Generated version: $VERSION"
+        
+    - name: Publish Linux x64
+      run: |
+        dotnet publish ImaToDicomConverter/ImaToDicomConverter.csproj \
+          -c Release \
+          --self-contained true \
+          -r linux-x64 \
+          -p:PublishSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -o ./publish/linux-x64
+          
+    - name: Publish Windows x64
+      run: |
+        dotnet publish ImaToDicomConverter/ImaToDicomConverter.csproj \
+          -c Release \
+          --self-contained true \
+          -r win-x64 \
+          -p:PublishSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -o ./publish/win-x64
+          
+    - name: Publish macOS x64
+      run: |
+        dotnet publish ImaToDicomConverter/ImaToDicomConverter.csproj \
+          -c Release \
+          --self-contained true \
+          -r osx-x64 \
+          -p:PublishSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -o ./publish/osx-x64
+          
+    - name: Publish macOS ARM64
+      run: |
+        dotnet publish ImaToDicomConverter/ImaToDicomConverter.csproj \
+          -c Release \
+          --self-contained true \
+          -r osx-arm64 \
+          -p:PublishSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -o ./publish/osx-arm64
+          
+    - name: Create release archives
+      run: |
+        cd publish/linux-x64
+        tar -czf ../ima2dicom-linux-x64.tar.gz ima2dicom
+        cd ../win-x64
+        zip ../ima2dicom-win-x64.zip ima2dicom.exe
+        cd ../osx-x64
+        tar -czf ../ima2dicom-macos-x64.tar.gz ima2dicom
+        cd ../osx-arm64
+        tar -czf ../ima2dicom-macos-arm64.tar.gz ima2dicom
+        cd ../..
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: Release ${{ steps.version.outputs.version }}
+        body: |
+          ## ima2dicom Release ${{ steps.version.outputs.version }}
+          
+          Automated release from commit ${{ github.sha }}
+          
+          ### Download Instructions
+          
+          Download the appropriate executable for your platform:
+          - **Linux x64**: `ima2dicom-linux-x64.tar.gz` - Extract and run `./ima2dicom`
+          - **Windows x64**: `ima2dicom-win-x64.zip` - Extract and run `ima2dicom.exe`
+          - **macOS Intel**: `ima2dicom-macos-x64.tar.gz` - Extract and run `./ima2dicom`
+          - **macOS Apple Silicon**: `ima2dicom-macos-arm64.tar.gz` - Extract and run `./ima2dicom`
+          
+          ### Usage
+          
+          ```bash
+          # Show help
+          ima2dicom --help
+          
+          # Convert files in current directory
+          ima2dicom
+          
+          # Convert with custom input/output directories
+          ima2dicom --in=/path/to/ima/files --out=/path/to/output
+          
+          # Generate default configuration file
+          ima2dicom --genconf
+          ```
+          
+          All executables are self-contained and require no additional dependencies.
+        draft: false
+        prerelease: false
+        files: |
+          publish/ima2dicom-linux-x64.tar.gz
+          publish/ima2dicom-win-x64.zip
+          publish/ima2dicom-macos-x64.tar.gz
+          publish/ima2dicom-macos-arm64.tar.gz
