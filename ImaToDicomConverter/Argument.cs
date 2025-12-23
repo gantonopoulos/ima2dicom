@@ -9,7 +9,8 @@ internal enum Argument
     In,
     Out,
     Config,
-    GenerateConfig
+    GenerateConfig,
+    Help
 }
 
 /// <summary>
@@ -28,6 +29,7 @@ internal static class ArgumentNameExtensions
             Argument.Out => "out",
             Argument.Config => "config",
             Argument.GenerateConfig => "genconf",
+            Argument.Help => "help",
             _ => throw new ArgumentOutOfRangeException(nameof(argumentName), argumentName, null)
         };
 

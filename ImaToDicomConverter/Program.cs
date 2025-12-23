@@ -2,6 +2,8 @@
 
 using FellowOakDicom;
 using ImaToDicomConverter;
+using LanguageExt;
+using LanguageExt.Common;
 
 
 class SomatomArCtConverter
@@ -10,61 +12,73 @@ class SomatomArCtConverter
     const int Height = 512;
     const int BytesPerPixel = 2;
     const int PixelBytes = Width * Height * BytesPerPixel;
-    
+
     static void Main(string[] args)
     {
-        // Handle help first, before any parsing
-        if (args.Length == 0 || args.Contains("--help"))
-        {
-            PrintUsage();
-            return;
-        }
-        
-        // Handle config generation
-        if (args.Any(arg => arg.StartsWith($"{Argument.GenerateConfig.AsCliString()}")))
-        {
-            HandleConfigGeneration(args);
-            return;
-        }
-        
-        ArgumentParser.Parse(args)
-            .Match(
-                parsed =>
-                {
-                    Console.WriteLine($"Input Directory: {parsed.InputDirectory}");
-                    Console.WriteLine($"Output Directory: {parsed.OutputDirectory}");
-                    Console.WriteLine($"Configuration: {System.Text.Json.JsonSerializer.Serialize(parsed.Config)}");
 
-                    // Here you would call the conversion logic using parsed.inputDirectory, parsed.outputDirectory, and parsed.config
-                    // // Resolve the shell '~' to the actual home directory
-                    // var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); // on Linux this maps to $HOME
-                    // var inputPath = Path.Combine(home, "Documents", "314447");
-                    // var outputPath = Path.Combine(home, "Documents", "314447", "DICOM_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
-                    //
-                    //
-                    int sliceIndex = 0;
-                    var studyUid = DicomUID.Generate();
-                    var seriesUid = DicomUID.Generate();
-                    Directory.GetFiles(parsed.InputDirectory, "*.ima")
-                        .ToList()
-                        .ForEach((file) =>
-                        {
-                            byte[] pixelData = new SomatomArCtConverter().ReadPixelData(file);
-                            DicomFile fileAsDicom = PixelDataToDicom(pixelData, sliceIndex++, studyUid, seriesUid, parsed.Config);
-                            Directory.CreateDirectory(parsed.OutputDirectory);
-                            fileAsDicom.Save(Path.Combine(parsed.OutputDirectory, Path.GetFileName(file).Replace(".ima", ".dcm")));
-                        });
-        
-        
-                    Console.WriteLine("Converted successfully.");
+        ArgumentCollecting.CollectArguments(args)
+            .Match(
+                collectedArguments =>
+                {
+                    if (collectedArguments.ContainsKey(Argument.Help.AsString()))
+                    {
+                        PrintUsage();
+                    }
+                    else if (collectedArguments.TryGetValue(Argument.GenerateConfig.AsString(), out var generatedConfigPath))
+                    {
+                        HandleConfigGeneration(generatedConfigPath);
+                    }
+                    else
+                    {
+                        ArgumentInterpreting.InterpretArguments(collectedArguments)
+                            .Match(
+                                parsed =>
+                                {
+                                    Console.WriteLine($"Input Directory: {parsed.InputDirectory}");
+                                    Console.WriteLine($"Output Directory: {parsed.OutputDirectory}");
+                                    Console.WriteLine(
+                                        $"Configuration: {System.Text.Json.JsonSerializer.Serialize(parsed.Config)}");
+
+                                    // Here you would call the conversion logic using parsed.inputDirectory, parsed.outputDirectory, and parsed.config
+                                    // // Resolve the shell '~' to the actual home directory
+                                    // var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); // on Linux this maps to $HOME
+                                    // var inputPath = Path.Combine(home, "Documents", "314447");
+                                    // var outputPath = Path.Combine(home, "Documents", "314447", "DICOM_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                                    //
+                                    //
+                                    int sliceIndex = 0;
+                                    var studyUid = DicomUID.Generate();
+                                    var seriesUid = DicomUID.Generate();
+                                    Directory.GetFiles(parsed.InputDirectory, "*.ima")
+                                        .ToList()
+                                        .ForEach((file) =>
+                                        {
+                                            byte[] pixelData = new SomatomArCtConverter().ReadPixelData(file);
+                                            DicomFile fileAsDicom = PixelDataToDicom(pixelData, sliceIndex++, studyUid,
+                                                seriesUid, parsed.Config);
+                                            Directory.CreateDirectory(parsed.OutputDirectory);
+                                            fileAsDicom.Save(Path.Combine(parsed.OutputDirectory,
+                                                Path.GetFileName(file).Replace(".ima", ".dcm")));
+                                        });
+
+
+                                    Console.WriteLine("Converted successfully.");
+                                },
+                                error =>
+                                {
+                                    Console.WriteLine($"Error: {error.Message}");
+                                    PrintUsage();
+                                }
+                            );
+                    }
+
                 },
                 error =>
                 {
-                    Console.WriteLine($"Error: {error.Message}");
+                    Console.WriteLine($"Error collecting arguments: {error.Message}");
                     PrintUsage();
                 }
             );
-        
     }
 
     private static void PrintUsage()
@@ -82,31 +96,8 @@ class SomatomArCtConverter
         Console.WriteLine("  --help             Show this help message.");
     }
     
-    private static void HandleConfigGeneration(string[] args)
+    private static void HandleConfigGeneration(string outputDir)
     {
-        // Parse the --genconf argument to see if a directory was specified
-        var genconfArg = args.FirstOrDefault(arg => arg.StartsWith($"{Argument.GenerateConfig.AsCliString()}"));
-        
-        if (genconfArg == null)
-        {
-            Console.WriteLine("Error: Failed to find --genconf argument.");
-            return;
-        }
-        
-        string? outputDir = null;
-        var parts = genconfArg.Split('=', 2);
-        if (parts.Length == 2)
-        {
-            outputDir = parts[1];
-            
-            // Validate the directory exists
-            if (!Directory.Exists(outputDir))
-            {
-                Console.WriteLine($"Error: Directory does not exist: {outputDir}");
-                return;
-            }
-        }
-        
         // Generate the config file
         ConfigGenerator.GenerateDefaultConfig(outputDir)
             .Match(
