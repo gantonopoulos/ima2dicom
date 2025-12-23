@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
+using ImaToDicomConverter.ApplicationArguments;
+using ImaToDicomConverter.DicomConversion;
 using Xunit;
 
 namespace ImaToDicomConverter.Tests;
@@ -20,7 +22,7 @@ public class DefaultConfigurationTests
         try
         {
             // Act
-            var result = ConfigGenerator.GenerateDefaultConfig(testDir);
+            var result = ConfigurationGenerator.GenerateDefaultConfig(testDir);
 
             // Assert
             Assert.True(result.IsRight);
@@ -53,7 +55,7 @@ public class DefaultConfigurationTests
     public void EmbeddedDefaultConfigResource_ShouldBeAccessible()
     {
         // Arrange
-        var assembly = typeof(ConfigGenerator).Assembly;
+        var assembly = typeof(ConfigurationGenerator).Assembly;
         var resourceName = "ImaToDicomConverter.default-config.json";
 
         // Act
@@ -67,7 +69,7 @@ public class DefaultConfigurationTests
     public void EmbeddedDefaultConfigResource_ShouldContainValidJson()
     {
         // Arrange
-        var assembly = typeof(ConfigGenerator).Assembly;
+        var assembly = typeof(ConfigurationGenerator).Assembly;
         var resourceName = "ImaToDicomConverter.default-config.json";
 
         // Act
@@ -113,7 +115,7 @@ public class DefaultConfigurationTests
     public void DefaultConfiguration_ShouldDeserializeToConverterConfiguration()
     {
         // Arrange
-        var assembly = typeof(ConfigGenerator).Assembly;
+        var assembly = typeof(ConfigurationGenerator).Assembly;
         var resourceName = "ImaToDicomConverter.default-config.json";
         using var stream = assembly.GetManifestResourceStream(resourceName);
         Assert.NotNull(stream);
@@ -131,7 +133,7 @@ public class DefaultConfigurationTests
 
         var exception = Record.Exception(() =>
         {
-            var config = JsonSerializer.Deserialize<ConverterConfiguration>(json, options);
+            var config = JsonSerializer.Deserialize<ConvertionParameters>(json, options);
             Assert.NotNull(config);
         });
 
@@ -148,7 +150,7 @@ public class DefaultConfigurationTests
 
         try
         {
-            var result = ConfigGenerator.GenerateDefaultConfig(testDir);
+            var result = ConfigurationGenerator.GenerateDefaultConfig(testDir);
             Assert.True(result.IsRight);
 
             string? configPath = null;
@@ -163,7 +165,7 @@ public class DefaultConfigurationTests
                 AllowTrailingCommas = true,
                 Converters = { new OptionJsonConverterFactory() }
             };
-            var config = JsonSerializer.Deserialize<ConverterConfiguration>(json, options);
+            var config = JsonSerializer.Deserialize<ConvertionParameters>(json, options);
 
             // Assert
             Assert.NotNull(config);

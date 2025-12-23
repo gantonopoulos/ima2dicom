@@ -1,3 +1,4 @@
+using ImaToDicomConverter.ApplicationArguments;
 using Xunit;
 
 namespace ImaToDicomConverter.Tests;
@@ -81,14 +82,14 @@ public class GenConfArgumentTests : IDisposable
         try
         {
             // Act
-            var result = ConfigGenerator.GenerateDefaultConfig();
+            var result = ConfigurationGenerator.GenerateDefaultConfig();
 
             // Assert
             Assert.True(result.IsRight);
             result.IfRight(generatedPath =>
             {
                 Assert.True(File.Exists(generatedPath));
-                Assert.Equal(Path.Combine(_testDirectory, ConfigGenerator.DefaultConfigJson), generatedPath);
+                Assert.Equal(Path.Combine(_testDirectory, ConfigurationGenerator.DefaultConfigJson), generatedPath);
                 _cleanupPaths.Add(generatedPath);
             });
         }
@@ -102,7 +103,7 @@ public class GenConfArgumentTests : IDisposable
     public void GenerateDefaultConfig_WithOutputDir_CreatesInSpecifiedDirectory()
     {
         // Arrange & Act
-        var result = ConfigGenerator.GenerateDefaultConfig(_testDirectory);
+        var result = ConfigurationGenerator.GenerateDefaultConfig(_testDirectory);
 
         // Assert
         Assert.True(result.IsRight);
@@ -110,7 +111,7 @@ public class GenConfArgumentTests : IDisposable
         {
             Assert.True(File.Exists(generatedPath));
             Assert.Contains(_testDirectory, generatedPath);
-            Assert.EndsWith(ConfigGenerator.DefaultConfigJson, generatedPath);
+            Assert.EndsWith(ConfigurationGenerator.DefaultConfigJson, generatedPath);
         });
     }
 
@@ -118,12 +119,12 @@ public class GenConfArgumentTests : IDisposable
     public void GenerateDefaultConfig_FileAlreadyExists_ReturnsError()
     {
         // Arrange
-        var existingFile = Path.Combine(_testDirectory, ConfigGenerator.DefaultConfigJson);
+        var existingFile = Path.Combine(_testDirectory, ConfigurationGenerator.DefaultConfigJson);
         File.WriteAllText(existingFile, "existing content");
         _cleanupPaths.Add(existingFile);
 
         // Act
-        var result = ConfigGenerator.GenerateDefaultConfig(_testDirectory);
+        var result = ConfigurationGenerator.GenerateDefaultConfig(_testDirectory);
 
         // Assert
         Assert.True(result.IsLeft);
@@ -137,7 +138,7 @@ public class GenConfArgumentTests : IDisposable
     public void GenerateDefaultConfig_CreatesValidJsonFile()
     {
         // Arrange & Act
-        var result = ConfigGenerator.GenerateDefaultConfig(_testDirectory);
+        var result = ConfigurationGenerator.GenerateDefaultConfig(_testDirectory);
 
         // Assert
         Assert.True(result.IsRight);

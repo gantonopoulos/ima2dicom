@@ -8,7 +8,7 @@ namespace ImaToDicomConverter;
 /// <summary>
 /// Utility for generating default configuration files from embedded resources.
 /// </summary>
-internal static class ConfigGenerator
+internal static class ConfigurationGenerator
 {
     private const string EmbeddedResourceName = "ImaToDicomConverter.default-config.json";
     

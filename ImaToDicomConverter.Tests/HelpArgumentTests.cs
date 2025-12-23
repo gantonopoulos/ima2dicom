@@ -1,3 +1,4 @@
+using ImaToDicomConverter.ApplicationArguments;
 using Xunit;
 
 namespace ImaToDicomConverter.Tests;

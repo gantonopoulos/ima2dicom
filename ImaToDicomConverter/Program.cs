@@ -1,90 +1,70 @@
-﻿// See https://aka.ms/new-console-template for more information
+﻿using FellowOakDicom;
+using ImaToDicomConverter.ApplicationArguments;
+using ImaToDicomConverter.DicomConversion;
 
-using FellowOakDicom;
-using ImaToDicomConverter;
-using LanguageExt;
-using LanguageExt.Common;
+namespace ImaToDicomConverter;
 
-
-class SomatomArCtConverter
+internal static class Program
 {
-    const int Width = 512;
-    const int Height = 512;
-    const int BytesPerPixel = 2;
-    const int PixelBytes = Width * Height * BytesPerPixel;
-
-    static void Main(string[] args)
+    private static void Main(string[] args)
     {
-
-        ArgumentCollecting.CollectArguments(args)
-            .Match(
-                collectedArguments =>
+        ArgumentCollecting.CollectArguments(args).Match(
+            collectedArguments =>
+            {
+                if (collectedArguments.ContainsKey(Argument.Help.AsString()))
                 {
-                    if (collectedArguments.ContainsKey(Argument.Help.AsString()))
-                    {
-                        PrintUsage();
-                    }
-                    else if (collectedArguments.TryGetValue(Argument.GenerateConfig.AsString(), out var generatedConfigPath))
-                    {
-                        HandleConfigGeneration(generatedConfigPath);
-                    }
-                    else
-                    {
-                        ArgumentInterpreting.InterpretArguments(collectedArguments)
-                            .Match(
-                                parsed =>
-                                {
-                                    Console.WriteLine($"Input Directory: {parsed.InputDirectory}");
-                                    Console.WriteLine($"Output Directory: {parsed.OutputDirectory}");
-                                    Console.WriteLine(
-                                        $"Configuration: {System.Text.Json.JsonSerializer.Serialize(parsed.Config)}");
-
-                                    // Here you would call the conversion logic using parsed.inputDirectory, parsed.outputDirectory, and parsed.config
-                                    // // Resolve the shell '~' to the actual home directory
-                                    // var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); // on Linux this maps to $HOME
-                                    // var inputPath = Path.Combine(home, "Documents", "314447");
-                                    // var outputPath = Path.Combine(home, "Documents", "314447", "DICOM_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
-                                    //
-                                    //
-                                    int sliceIndex = 0;
-                                    var studyUid = DicomUID.Generate();
-                                    var seriesUid = DicomUID.Generate();
-                                    Directory.GetFiles(parsed.InputDirectory, "*.ima")
-                                        .ToList()
-                                        .ForEach((file) =>
-                                        {
-                                            byte[] pixelData = new SomatomArCtConverter().ReadPixelData(file);
-                                            DicomFile fileAsDicom = PixelDataToDicom(pixelData, sliceIndex++, studyUid,
-                                                seriesUid, parsed.Config);
-                                            Directory.CreateDirectory(parsed.OutputDirectory);
-                                            fileAsDicom.Save(Path.Combine(parsed.OutputDirectory,
-                                                Path.GetFileName(file).Replace(".ima", ".dcm")));
-                                        });
-
-
-                                    Console.WriteLine("Converted successfully.");
-                                },
-                                error =>
-                                {
-                                    Console.WriteLine($"Error: {error.Message}");
-                                    PrintUsage();
-                                }
-                            );
-                    }
-
-                },
-                error =>
-                {
-                    Console.WriteLine($"Error collecting arguments: {error.Message}");
                     PrintUsage();
                 }
-            );
+                else if (collectedArguments.TryGetValue(Argument.GenerateConfig.AsString(),
+                             out var generatedConfigPath))
+                {
+                    HandleConfigGeneration(generatedConfigPath);
+                }
+                else
+                {
+                    ArgumentInterpreting.InterpretArguments(collectedArguments).Match(
+                        parsedArguments =>
+                        {
+                            Console.WriteLine($"Input Directory: {parsedArguments.InputDirectory}");
+                            Console.WriteLine($"Output Directory: {parsedArguments.OutputDirectory}");
+                            Console.WriteLine($"Configuration: " +
+                                              $"{System.Text.Json.JsonSerializer.Serialize(parsedArguments.Config)}");
+
+                            var converter = new Ima2DicomConverter();
+                            Directory.GetFiles(parsedArguments.InputDirectory, "*.ima")
+                                .ToList()
+                                .ForEach((file) =>
+                                {
+                                    DicomFile convertedFile = converter.Ima2Dicom(file, parsedArguments.Config);
+                                    Directory.CreateDirectory(parsedArguments.OutputDirectory);
+                                    convertedFile.Save(Path.Combine(parsedArguments.OutputDirectory,
+                                        Path.GetFileName(file).Replace(".ima", ".dcm")));
+                                });
+
+
+                            Console.WriteLine("Converted successfully.");
+                        },
+                        error =>
+                        {
+                            Console.WriteLine($"Error: {error.Message}");
+                            PrintUsage();
+                        }
+                    );
+                }
+
+            },
+            error =>
+            {
+                Console.WriteLine($"Error collecting arguments: {error.Message}");
+                PrintUsage();
+            }
+        );
     }
 
     private static void PrintUsage()
     {
         Console.WriteLine(
-            $"Usage: SomatomArCtConverter " +
+            $"Usage: ima2dicom " +
             $"{Argument.In.AsCliString()}=<input_directory> " +
             $"{Argument.Out.AsCliString()}=<output_directory> " +
             $"{Argument.Config.AsCliString()}=<config_file>");
@@ -99,7 +79,7 @@ class SomatomArCtConverter
     private static void HandleConfigGeneration(string outputDir)
     {
         // Generate the config file
-        ConfigGenerator.GenerateDefaultConfig(outputDir)
+        ConfigurationGenerator.GenerateDefaultConfig(outputDir)
             .Match(
                 path =>
                 {
@@ -115,86 +95,4 @@ class SomatomArCtConverter
                 }
             );
     }
-    
-    private byte[] ReadPixelData(string file)
-    {
-        byte[] pixelData;
-        using var fs = File.OpenRead(file);
-        var pixelOffset = fs.Length - PixelBytes;
-
-        fs.Seek(pixelOffset, SeekOrigin.Begin);
-        pixelData = new byte[PixelBytes];
-        fs.ReadExactly(pixelData);
-
-        return pixelData;
-    }
-    
-    private static DicomFile PixelDataToDicom(byte[] pixelData, int sliceIndex, DicomUID studyUid, DicomUID seriesUid, ConverterConfiguration config)
-    {
-        EnsureLittleEndianInt16(pixelData);
-        
-        var ds = new DicomDataset(DicomTransferSyntax.ExplicitVRLittleEndian);
-        
-        // ---- identity (hardcoded, not configurable) ----
-        ds.Add(DicomTag.SOPClassUID, DicomUID.CTImageStorage);
-        ds.Add(DicomTag.SOPInstanceUID, DicomUID.Generate());
-        ds.Add(DicomTag.StudyInstanceUID, studyUid);
-        ds.Add(DicomTag.SeriesInstanceUID, seriesUid);
-        
-        // ---- geometry (configurable) ----
-        config.Rows.IfSome(value => ds.Add(DicomTag.Rows, value));
-        config.Columns.IfSome(value => ds.Add(DicomTag.Columns, value));
-        
-        // ---- pixel format (configurable) ----
-        config.SamplesPerPixel.IfSome(value => ds.Add(DicomTag.SamplesPerPixel, value));
-        config.PhotometricInterpretation.IfSome(value => ds.Add(DicomTag.PhotometricInterpretation, value));
-        config.BitsAllocated.IfSome(value => ds.Add(DicomTag.BitsAllocated, value));
-        config.BitsStored.IfSome(value => ds.Add(DicomTag.BitsStored, value));
-        config.HighBit.IfSome(value => ds.Add(DicomTag.HighBit, value));
-        config.PixelRepresentation.IfSome(value => ds.Add(DicomTag.PixelRepresentation, value));
-        
-        // ---- CT scaling (configurable) ----
-        config.RescaleSlope.IfSome(value => ds.Add(DicomTag.RescaleSlope, value));
-        config.RescaleIntercept.IfSome(value => ds.Add(DicomTag.RescaleIntercept, value));
-        
-        // ---- Display window (configurable) ----
-        config.WindowCenter.IfSome(value => ds.Add(DicomTag.WindowCenter, value));
-        config.WindowWidth.IfSome(value => ds.Add(DicomTag.WindowWidth, value));
-        
-        // ---- Spacing (configurable) ----
-        config.SliceThickness.IfSome(value => ds.Add(DicomTag.SliceThickness, value));
-        config.SpacingBetweenSlices.IfSome(value => ds.Add(DicomTag.SpacingBetweenSlices, value));
-        config.PixelSpacing.IfSome(value => ds.Add(DicomTag.PixelSpacing, ParsePixelSpacing(value)));
-        
-        // ---- Modality (configurable) ----
-        config.Modality.IfSome(value => ds.Add(DicomTag.Modality, value));
-        
-        // ---- Pixel data (hardcoded, always required) ----
-        ds.Add(DicomTag.PixelData, pixelData);
-        
-        return new DicomFile(ds);
-    }
-
-    private static double[] ParsePixelSpacing(string pixelSpacingStr)
-    {
-        var parts = pixelSpacingStr.Split(',');
-        if (parts.Length == 2 && 
-            double.TryParse(parts[0].Trim(), out var row) && 
-            double.TryParse(parts[1].Trim(), out var col))
-        {
-            return new[] { row, col };
-        }
-
-        throw new ArgumentException($"Invalid PixelSpacing format: '{pixelSpacingStr}'. Expected format: '0.48828125,0.48828125'");
-    }
-    
-    static void EnsureLittleEndianInt16(byte[] data)
-    {
-        for (int i = 0; i < data.Length; i += 2)
-        {
-            // Siemens sometimes stores big-endian
-            (data[i], data[i + 1]) = (data[i + 1], data[i]);
-        }
-    }
-
 }

@@ -9,7 +9,7 @@ public class SimpleResourceTest
     public void EmbeddedResource_ShouldExist()
     {
         // Arrange
-        var assembly = typeof(ConfigGenerator).Assembly;
+        var assembly = typeof(ConfigurationGenerator).Assembly;
         
         // Act
         var resources = assembly.GetManifestResourceNames();

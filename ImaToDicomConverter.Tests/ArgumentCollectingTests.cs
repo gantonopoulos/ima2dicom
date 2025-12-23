@@ -1,3 +1,4 @@
+using ImaToDicomConverter.ApplicationArguments;
 using ImaToDicomConverter.Errors;
 using Xunit;
 

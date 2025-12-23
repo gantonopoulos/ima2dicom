@@ -1,12 +1,14 @@
+using ImaToDicomConverter.ApplicationArguments;
+using ImaToDicomConverter.DicomConversion;
 using Xunit;
 
 namespace ImaToDicomConverter.Tests;
 
-public class ConfigGeneratorTests
+public class ConfigurationGeneratorTests
 {
     private const string TestConfigDirectory = "TestGenConf";
 
-    public ConfigGeneratorTests()
+    public ConfigurationGeneratorTests()
     {
         // Ensure test directory exists and is clean
         if (Directory.Exists(TestConfigDirectory))
@@ -28,7 +30,7 @@ public class ConfigGeneratorTests
             Directory.SetCurrentDirectory(testDir);
 
             // Act
-            var result = ConfigGenerator.GenerateDefaultConfig();
+            var result = ConfigurationGenerator.GenerateDefaultConfig();
 
             // Assert
             Assert.True(result.IsRight);
@@ -58,7 +60,7 @@ public class ConfigGeneratorTests
         Directory.CreateDirectory(outputDir);
 
         // Act
-        var result = ConfigGenerator.GenerateDefaultConfig(outputDir);
+        var result = ConfigurationGenerator.GenerateDefaultConfig(outputDir);
 
         // Assert
         Assert.True(result.IsRight);
@@ -83,7 +85,7 @@ public class ConfigGeneratorTests
         File.WriteAllText(existingFile, "existing content");
 
         // Act
-        var result = ConfigGenerator.GenerateDefaultConfig(outputDir);
+        var result = ConfigurationGenerator.GenerateDefaultConfig(outputDir);
 
         // Assert
         Assert.True(result.IsLeft);
@@ -100,7 +102,7 @@ public class ConfigGeneratorTests
         var invalidDir = Path.Combine(TestConfigDirectory, "nonexistent", "deeply", "nested");
 
         // Act
-        var result = ConfigGenerator.GenerateDefaultConfig(invalidDir);
+        var result = ConfigurationGenerator.GenerateDefaultConfig(invalidDir);
 
         // Assert
         Assert.True(result.IsLeft);
@@ -114,7 +116,7 @@ public class ConfigGeneratorTests
         Directory.CreateDirectory(outputDir);
 
         // Act
-        var result = ConfigGenerator.GenerateDefaultConfig(outputDir);
+        var result = ConfigurationGenerator.GenerateDefaultConfig(outputDir);
 
         // Assert
         Assert.True(result.IsRight);
@@ -130,7 +132,7 @@ public class ConfigGeneratorTests
                 Converters = { new OptionJsonConverterFactory() }
             };
             
-            var config = System.Text.Json.JsonSerializer.Deserialize<ConverterConfiguration>(content, options);
+            var config = System.Text.Json.JsonSerializer.Deserialize<ConvertionParameters>(content, options);
             Assert.NotNull(config);
             
             // Verify expected fields are present

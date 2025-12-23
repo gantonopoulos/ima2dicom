@@ -1,7 +1,7 @@
 using LanguageExt;
 using static LanguageExt.Prelude;
 
-namespace ImaToDicomConverter;
+namespace ImaToDicomConverter.DicomConversion;
 
 /// <summary>
 /// Configuration for static DICOM parameters.
@@ -9,7 +9,7 @@ namespace ImaToDicomConverter;
 /// Only parameters explicitly provided in the JSON configuration will be set.
 /// Null values will cause validation errors during parsing.
 /// </summary>
-public sealed class ConverterConfiguration
+public sealed class ConvertionParameters
 {
     // ---- Geometry ----
     /// <summary>

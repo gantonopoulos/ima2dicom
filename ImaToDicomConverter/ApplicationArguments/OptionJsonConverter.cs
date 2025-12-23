@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using LanguageExt;
 using static LanguageExt.Prelude;
 
-namespace ImaToDicomConverter;
+namespace ImaToDicomConverter.ApplicationArguments;
 
 /// <summary T="types.
 /// Converts null or missing values to None, and present values to Some(value).">

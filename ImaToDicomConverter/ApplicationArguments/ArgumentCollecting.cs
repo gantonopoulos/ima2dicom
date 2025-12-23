@@ -1,13 +1,14 @@
+using ImaToDicomConverter.DicomConversion;
 using ImaToDicomConverter.Errors;
 using LanguageExt;
 using LanguageExt.Common;
 
-namespace ImaToDicomConverter;
+namespace ImaToDicomConverter.ApplicationArguments;
 
 internal record ParsedArguments(
     string InputDirectory,
     string OutputDirectory,
-    ConverterConfiguration Config);
+    ConvertionParameters Config);
 
 internal static class ArgumentCollecting
 {

@@ -1,9 +1,10 @@
 using System.Text.Json;
+using ImaToDicomConverter.DicomConversion;
 using ImaToDicomConverter.Errors;
 using LanguageExt;
 using LanguageExt.Common;
 
-namespace ImaToDicomConverter;
+namespace ImaToDicomConverter.ApplicationArguments;
 
 internal static class ArgumentInterpreting
 {
@@ -18,7 +19,7 @@ internal static class ArgumentInterpreting
             knownArguments => ParseConfig(lookup).Map(config => knownArguments with { Config = config })
         };
         
-        var initial = new ParsedArguments(string.Empty, string.Empty, new ConverterConfiguration());
+        var initial = new ParsedArguments(string.Empty, string.Empty, new ConvertionParameters());
         return mandatoryParsers.Fold(Prelude.Right<Error, ParsedArguments>(initial),
             (aggregatedArgument, parser) => aggregatedArgument.Bind(parser));
     }
@@ -33,22 +34,22 @@ internal static class ArgumentInterpreting
         return lookup.TryGetValue(Argument.Out.AsString(), out var value) ? value : Directory.GetCurrentDirectory();
     }
 
-    private static Either<Error, ConverterConfiguration> ParseConfig(ArgumentLookUp lookup)
+    private static Either<Error, ConvertionParameters> ParseConfig(ArgumentLookUp lookup)
     {
         var argName = Argument.Config.AsString();
         return lookup.TryGetValue(argName, out var configPath)
             ? File.Exists(configPath)
                 ? Prelude.Try(() => LoadConfig(configPath))
-                    .Match(Prelude.Right<Error, ConverterConfiguration>,
-                        ex => Prelude.Left<Error, ConverterConfiguration>(
+                    .Match(Prelude.Right<Error, ConvertionParameters>,
+                        ex => Prelude.Left<Error, ConvertionParameters>(
                             new ArgumentError($"Failed to load config: {ex.Message}"))
                     )
-                : Prelude.Left<Error, ConverterConfiguration>(
+                : Prelude.Left<Error, ConvertionParameters>(
                     new ArgumentError($"The config file does not exist: {configPath}"))
-            : ConfigGenerator.LoadDefaultConfigToTempFile().Map(LoadConfig);
+            : ConfigurationGenerator.LoadDefaultConfigToTempFile().Map(LoadConfig);
     }
 
-    private static ConverterConfiguration LoadConfig(string configPath)
+    private static ConvertionParameters LoadConfig(string configPath)
     {
         var json = File.ReadAllText(configPath);
         var options = new JsonSerializerOptions
@@ -57,7 +58,7 @@ internal static class ArgumentInterpreting
             AllowTrailingCommas = true,
             Converters = { new OptionJsonConverterFactory() }
         };
-        return JsonSerializer.Deserialize<ConverterConfiguration>(json, options)
+        return JsonSerializer.Deserialize<ConvertionParameters>(json, options)
                ?? throw new Exception("Failed to deserialize config.");
     }
     

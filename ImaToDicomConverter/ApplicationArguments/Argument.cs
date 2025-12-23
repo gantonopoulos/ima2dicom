@@ -1,4 +1,4 @@
-namespace ImaToDicomConverter;
+namespace ImaToDicomConverter.ApplicationArguments;
 
 /// <summary>
 /// Enumeration of known command-line argument names.
