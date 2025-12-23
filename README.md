@@ -4,6 +4,74 @@ Siemens IMA (VB41) CT to DICOM Converter
 This project contains a C# tool that converts legacy Siemens CT .ima files (VB41-era, non-standard format) into standard DICOM images using fo-dicom for visualization and analysis.
 It was developed through reverse engineering of publicly available file characteristics and empirical validation in Weasis and GIMP.
 
+## Download
+
+Pre-built self-contained executables are available in the [Releases](../../releases) section. Download the appropriate version for your platform:
+- **Linux x64**: `ima2dicom-linux-x64.tar.gz`
+- **Windows x64**: `ima2dicom-win-x64.zip`
+- **macOS Intel**: `ima2dicom-macos-x64.tar.gz`
+- **macOS Apple Silicon**: `ima2dicom-macos-arm64.tar.gz`
+
+No additional dependencies or runtime installation required.
+
+## Usage
+
+```bash
+# Show help
+ima2dicom --help
+
+# Convert files in current directory
+ima2dicom
+
+# Convert with custom input/output directories
+ima2dicom --in=/path/to/ima/files --out=/path/to/output
+
+# Use custom configuration file
+ima2dicom --in=/input --out=/output --config=my-config.json
+
+# Generate default configuration file for customization
+ima2dicom --genconf
+```
+
+All command-line arguments are optional with sensible defaults:
+- Input directory defaults to current directory
+- Output directory defaults to current directory (auto-created if missing)
+- Configuration defaults to built-in settings (or generate with `--genconf`)
+
+## Building from Source
+
+### Prerequisites
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (preview)
+
+### Build and Test
+```bash
+# Restore dependencies
+dotnet restore
+
+# Build
+dotnet build --configuration Release
+
+# Run tests
+dotnet test --configuration Release
+
+# Publish self-contained executable (example for Linux)
+dotnet publish ImaToDicomConverter/ImaToDicomConverter.csproj \
+  -c Release \
+  --self-contained true \
+  -r linux-x64 \
+  -p:PublishSingleFile=true \
+  -o ./publish
+```
+
+## CI/CD
+
+The project includes automated GitHub Actions workflows that:
+- Build and test the code on every push to main
+- Create self-contained releases for Linux, Windows, and macOS
+- Automatically publish releases with downloadable executables
+
+Releases are created automatically when code is pushed to the main branch or when pull requests are merged.
+
 
 #Disclaimer
 
