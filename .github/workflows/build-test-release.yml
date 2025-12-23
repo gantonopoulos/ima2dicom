@@ -100,15 +100,10 @@ jobs:
           
     - name: Create release archives
       run: |
-        cd publish/linux-x64
-        tar -czf ../ima2dicom-linux-x64.tar.gz ima2dicom
-        cd ../win-x64
-        zip ../ima2dicom-win-x64.zip ima2dicom.exe
-        cd ../osx-x64
-        tar -czf ../ima2dicom-macos-x64.tar.gz ima2dicom
-        cd ../osx-arm64
-        tar -czf ../ima2dicom-macos-arm64.tar.gz ima2dicom
-        cd ../..
+        tar -czf publish/ima2dicom-linux-x64.tar.gz -C publish/linux-x64 ima2dicom
+        (cd publish/win-x64 && zip ../ima2dicom-win-x64.zip ima2dicom.exe)
+        tar -czf publish/ima2dicom-macos-x64.tar.gz -C publish/osx-x64 ima2dicom
+        tar -czf publish/ima2dicom-macos-arm64.tar.gz -C publish/osx-arm64 ima2dicom
         
     - name: Create Release
       uses: softprops/action-gh-release@v2
