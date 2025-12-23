@@ -14,7 +14,7 @@ internal static class ArgumentInterpreting
         {
             knownArguments => ValidateDirectory(ParseSourceDirectory(lookup))
                 .Map(dir => knownArguments with { InputDirectory = dir }),
-            knownArguments => ValidateDirectory(ParseDestinationDirectory(lookup))
+            knownArguments => ValidateOrCreateOutputDirectory(ParseDestinationDirectory(lookup))
                 .Map(dir => knownArguments with { OutputDirectory = dir }),
             knownArguments => ParseConfig(lookup).Map(config => knownArguments with { Config = config })
         };
@@ -60,6 +60,52 @@ internal static class ArgumentInterpreting
         };
         return JsonSerializer.Deserialize<ConvertionParameters>(json, options)
                ?? throw new Exception("Failed to deserialize config.");
+    }
+    
+    private static Either<Error, string> ValidateOrCreateOutputDirectory(string path)
+    {
+        try
+        {
+            // If directory exists, just return it
+            if (Directory.Exists(path))
+            {
+                return Prelude.Right<Error, string>(path);
+            }
+            
+            // Try to create the directory
+            Directory.CreateDirectory(path);
+            return Prelude.Right<Error, string>(path);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Prelude.Left<Error, string>(
+                new ArgumentError($"Access denied when creating output directory '{path}': {ex.Message}"));
+        }
+        catch (PathTooLongException ex)
+        {
+            return Prelude.Left<Error, string>(
+                new ArgumentError($"Output directory path is too long '{path}': {ex.Message}"));
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            return Prelude.Left<Error, string>(
+                new ArgumentError($"Invalid output directory path '{path}': {ex.Message}"));
+        }
+        catch (NotSupportedException ex)
+        {
+            return Prelude.Left<Error, string>(
+                new ArgumentError($"Output directory path contains invalid characters '{path}': {ex.Message}"));
+        }
+        catch (IOException ex)
+        {
+            return Prelude.Left<Error, string>(
+                new ArgumentError($"I/O error when creating output directory '{path}': {ex.Message}"));
+        }
+        catch (Exception ex)
+        {
+            return Prelude.Left<Error, string>(
+                new ArgumentError($"Failed to create output directory '{path}': {ex.Message}"));
+        }
     }
     
     private static Either<Error, string> ValidateDirectory(string path)

@@ -166,25 +166,30 @@ public class ArgumentInterpretingTests : IDisposable
     }
 
     [Fact]
-    public void InterpretArguments_NonExistentOutputDirectory_ReturnsError()
+    public void InterpretArguments_NonExistentOutputDirectory_CreatesDirectory()
     {
         // Arrange
-        var nonExistentDir = Path.Combine(Path.GetTempPath(), $"nonexistent_{Guid.NewGuid()}");
+        var nonExistentDir = Path.Combine(Path.GetTempPath(), $"new_output_{Guid.NewGuid()}");
+        _cleanupPaths.Add(nonExistentDir); // Add to cleanup list
+        
         var lookup = new Dictionary<string, string>
         {
             ["in"] = _testInputDir,
             ["out"] = nonExistentDir
         };
 
+        // Verify directory doesn't exist before the call
+        Assert.False(Directory.Exists(nonExistentDir));
+
         // Act
         var result = ArgumentInterpreting.InterpretArguments(lookup);
 
         // Assert
-        Assert.True(result.IsLeft);
-        result.IfLeft(error =>
+        Assert.True(result.IsRight);
+        result.IfRight(parsed =>
         {
-            Assert.IsType<ArgumentError>(error);
-            Assert.Contains("does not exist", error.Message);
+            Assert.Equal(nonExistentDir, parsed.OutputDirectory);
+            Assert.True(Directory.Exists(nonExistentDir), "Output directory should have been created");
         });
     }
 
@@ -297,5 +302,82 @@ public class ArgumentInterpretingTests : IDisposable
             Assert.Contains("Failed to load config", error.Message);
         });
     }
+
+    [Fact]
+    public void InterpretArguments_OutputDirectoryWithInvalidCharacters_ReturnsError()
+    {
+        // Arrange
+        // Use invalid path characters that will cause Directory.CreateDirectory to fail
+        var invalidPath = Path.Combine(Path.GetTempPath(), "invalid\0path");
+        
+        var lookup = new Dictionary<string, string>
+        {
+            ["in"] = _testInputDir,
+            ["out"] = invalidPath
+        };
+
+        // Act
+        var result = ArgumentInterpreting.InterpretArguments(lookup);
+
+        // Assert
+        Assert.True(result.IsLeft);
+        result.IfLeft(error =>
+        {
+            Assert.IsType<ArgumentError>(error);
+            Assert.Contains("output directory", error.Message.ToLower());
+        });
+    }
+
+    [Fact]
+    public void InterpretArguments_OutputDirectoryAlreadyExists_Succeeds()
+    {
+        // Arrange
+        // Use existing output directory
+        var lookup = new Dictionary<string, string>
+        {
+            ["in"] = _testInputDir,
+            ["out"] = _testOutputDir // This already exists
+        };
+
+        // Act
+        var result = ArgumentInterpreting.InterpretArguments(lookup);
+
+        // Assert
+        Assert.True(result.IsRight);
+        result.IfRight(parsed =>
+        {
+            Assert.Equal(_testOutputDir, parsed.OutputDirectory);
+            Assert.True(Directory.Exists(_testOutputDir));
+        });
+    }
+
+    [Fact]
+    public void InterpretArguments_NestedNonExistentOutputDirectory_CreatesAllLevels()
+    {
+        // Arrange
+        var nestedDir = Path.Combine(Path.GetTempPath(), $"level1_{Guid.NewGuid()}", "level2", "level3");
+        _cleanupPaths.Add(Path.Combine(Path.GetTempPath(), Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(nestedDir))!)));
+        
+        var lookup = new Dictionary<string, string>
+        {
+            ["in"] = _testInputDir,
+            ["out"] = nestedDir
+        };
+
+        // Verify directory doesn't exist before the call
+        Assert.False(Directory.Exists(nestedDir));
+
+        // Act
+        var result = ArgumentInterpreting.InterpretArguments(lookup);
+
+        // Assert
+        Assert.True(result.IsRight);
+        result.IfRight(parsed =>
+        {
+            Assert.Equal(nestedDir, parsed.OutputDirectory);
+            Assert.True(Directory.Exists(nestedDir), "Nested output directory should have been created");
+        });
+    }
 }
+
 
