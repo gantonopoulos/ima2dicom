@@ -1,0 +1,46 @@
+{
+  // ---- Modality ----
+  // Modality (e.g., "CT" for Computed Tomography)
+  "Modality": "CT",
+
+  // ---- Geometry ----
+  // Image height in pixels (e.g., 512)
+  "Rows": 512,
+  // Image width in pixels (e.g., 512)
+  "Columns": 512,
+
+  // ---- Pixel Format ----
+  // Number of color planes (typically 1 for monochrome)
+  "SamplesPerPixel": 1,
+  // Photometric interpretation (e.g., "MONOCHROME2")
+  "PhotometricInterpretation": "MONOCHROME2",
+  // Bits allocated per sample (typically 16)
+  "BitsAllocated": 16,
+  // Bits actually stored (typically 16)
+  "BitsStored": 16,
+  // High bit position (typically 15 for 16-bit data)
+  "HighBit": 15,
+  // Pixel representation: 0=unsigned, 1=signed (typically 1 for CT)
+  "PixelRepresentation": 1,
+
+  // ---- CT Scaling ----
+  // Rescale slope for converting stored values to real values (typically 1.0)
+  "RescaleSlope": 1.0,
+  // Rescale intercept for converting stored values to real values (typically -1024.0 for CT)
+  "RescaleIntercept": -1024.0,
+
+  // ---- Display Window ----
+  // Window center for display (e.g., 2000.0 for CT)
+  "WindowCenter": 2000.0,
+  // Window width for display (e.g., 4000.0 for CT)
+  "WindowWidth": 4000.0,
+
+  // ---- Spacing ----
+  // Slice thickness in mm (e.g., 3.0)
+  "SliceThickness": 3.0,
+  // Spacing between slices in mm (e.g., 0.01)
+  "SpacingBetweenSlices": 0.01,
+  // Pixel spacing in mm (row spacing, column spacing). Format: "0.48828125,0.48828125"
+  "PixelSpacing": "0.48828125,0.48828125"
+}
+
