@@ -4,6 +4,11 @@ using Xunit;
 
 namespace ImaToDicomConverter.Tests;
 
+/// <summary>
+/// Tests for ConfigurationGenerator that may change the current directory.
+/// Uses a collection to prevent parallel execution with other tests.
+/// </summary>
+[Collection("Sequential")]
 public class ConfigurationGeneratorTests
 {
     private const string TestConfigDirectory = "TestGenConf";

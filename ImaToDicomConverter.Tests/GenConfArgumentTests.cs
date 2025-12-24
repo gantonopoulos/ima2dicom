@@ -6,7 +6,9 @@ namespace ImaToDicomConverter.Tests;
 /// <summary>
 /// Tests for the --genconf argument functionality.
 /// When present, the application should generate a default configuration file and terminate.
+/// Uses a collection to prevent parallel execution with other tests.
 /// </summary>
+[Collection("Sequential")]
 public class GenConfArgumentTests : IDisposable
 {
     private readonly string _testDirectory;

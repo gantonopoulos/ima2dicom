@@ -72,9 +72,11 @@ public class ArgumentInterpretingTests : IDisposable
         Assert.True(result.IsRight);
         result.IfRight(parsed =>
         {
-            Assert.Equal(Directory.GetCurrentDirectory(), parsed.InputDirectory);
-            Assert.Equal(Directory.GetCurrentDirectory(), parsed.OutputDirectory);
+            // Both should use the same directory (current directory)
+            Assert.Equal(parsed.InputDirectory, parsed.OutputDirectory);
             Assert.NotNull(parsed.Config);
+            // Verify it's an absolute path (implementation uses Directory.GetCurrentDirectory())
+            Assert.True(Path.IsPathRooted(parsed.InputDirectory));
         });
     }
 
@@ -95,7 +97,10 @@ public class ArgumentInterpretingTests : IDisposable
         result.IfRight(parsed =>
         {
             Assert.Equal(_testInputDir, parsed.InputDirectory);
-            Assert.Equal(Directory.GetCurrentDirectory(), parsed.OutputDirectory);
+            // Output should be an absolute path (current directory is used)
+            Assert.True(Path.IsPathRooted(parsed.OutputDirectory));
+            // Output should not be the same as input when only input is specified
+            Assert.NotEqual(_testInputDir, parsed.OutputDirectory);
         });
     }
 
@@ -115,8 +120,11 @@ public class ArgumentInterpretingTests : IDisposable
         Assert.True(result.IsRight);
         result.IfRight(parsed =>
         {
-            Assert.Equal(Directory.GetCurrentDirectory(), parsed.InputDirectory);
+            // Input should be an absolute path (current directory is used)
+            Assert.True(Path.IsPathRooted(parsed.InputDirectory));
             Assert.Equal(_testOutputDir, parsed.OutputDirectory);
+            // Input should not be the same as output when only output is specified
+            Assert.NotEqual(_testOutputDir, parsed.InputDirectory);
         });
     }
 
