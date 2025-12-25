@@ -66,10 +66,12 @@ internal static class ArgumentInterpreting
     {
         try
         {
-            // If directory exists, just return it
+            // If directory exists, create a timestamped copy to avoid overwriting
             if (Directory.Exists(path))
             {
-                return Prelude.Right<Error, string>(path);
+                var copyDirectory = path + DateTime.Now.ToString("yyyyMMddHHmmss");
+                Directory.CreateDirectory(copyDirectory);
+                return Prelude.Right<Error, string>(copyDirectory);
             }
             
             // Try to create the directory

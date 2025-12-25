@@ -64,6 +64,7 @@ public class ArgumentInterpretingTests : IDisposable
     {
         // Arrange
         var lookup = new Dictionary<string, string>();
+        var currentDir = Directory.GetCurrentDirectory();
 
         // Act
         var result = ArgumentInterpreting.InterpretArguments(lookup);
@@ -72,11 +73,19 @@ public class ArgumentInterpretingTests : IDisposable
         Assert.True(result.IsRight);
         result.IfRight(parsed =>
         {
-            // Both should use the same directory (current directory)
-            Assert.Equal(parsed.InputDirectory, parsed.OutputDirectory);
+            // Input should use current directory
+            Assert.Equal(currentDir, parsed.InputDirectory);
+            // Output should be a timestamped copy of current directory since it exists
+            Assert.NotEqual(currentDir, parsed.OutputDirectory);
+            Assert.StartsWith(currentDir, parsed.OutputDirectory);
+            Assert.Matches(@"\d{14}$", parsed.OutputDirectory);
             Assert.NotNull(parsed.Config);
-            // Verify it's an absolute path (implementation uses Directory.GetCurrentDirectory())
+            // Verify both are absolute paths
             Assert.True(Path.IsPathRooted(parsed.InputDirectory));
+            Assert.True(Path.IsPathRooted(parsed.OutputDirectory));
+            
+            // Cleanup the timestamped directory
+            _cleanupPaths.Add(parsed.OutputDirectory);
         });
     }
 
@@ -122,9 +131,13 @@ public class ArgumentInterpretingTests : IDisposable
         {
             // Input should be an absolute path (current directory is used)
             Assert.True(Path.IsPathRooted(parsed.InputDirectory));
-            Assert.Equal(_testOutputDir, parsed.OutputDirectory);
-            // Input should not be the same as output when only output is specified
+            // Since _testOutputDir already exists, a timestamped copy should be created
             Assert.NotEqual(_testOutputDir, parsed.InputDirectory);
+            Assert.StartsWith(_testOutputDir, parsed.OutputDirectory);
+            Assert.True(Directory.Exists(parsed.OutputDirectory));
+            
+            // Cleanup the timestamped directory
+            _cleanupPaths.Add(parsed.OutputDirectory);
         });
     }
 
@@ -146,7 +159,13 @@ public class ArgumentInterpretingTests : IDisposable
         result.IfRight(parsed =>
         {
             Assert.Equal(_testInputDir, parsed.InputDirectory);
-            Assert.Equal(_testOutputDir, parsed.OutputDirectory);
+            // Since _testOutputDir already exists, a timestamped copy should be created
+            Assert.NotEqual(_testOutputDir, parsed.OutputDirectory);
+            Assert.StartsWith(_testOutputDir, parsed.OutputDirectory);
+            Assert.True(Directory.Exists(parsed.OutputDirectory));
+            
+            // Cleanup the timestamped directory
+            _cleanupPaths.Add(parsed.OutputDirectory);
         });
     }
 
@@ -337,7 +356,7 @@ public class ArgumentInterpretingTests : IDisposable
     }
 
     [Fact]
-    public void InterpretArguments_OutputDirectoryAlreadyExists_Succeeds()
+    public void InterpretArguments_OutputDirectoryAlreadyExists_CreatesTimestampedCopy()
     {
         // Arrange
         // Use existing output directory
@@ -354,8 +373,15 @@ public class ArgumentInterpretingTests : IDisposable
         Assert.True(result.IsRight);
         result.IfRight(parsed =>
         {
-            Assert.Equal(_testOutputDir, parsed.OutputDirectory);
-            Assert.True(Directory.Exists(_testOutputDir));
+            // Should create a timestamped copy, not use the original
+            Assert.NotEqual(_testOutputDir, parsed.OutputDirectory);
+            Assert.StartsWith(_testOutputDir, parsed.OutputDirectory);
+            // The new directory should have a timestamp suffix (format: yyyyMMddHHmmss)
+            Assert.Matches(@"\d{14}$", parsed.OutputDirectory);
+            Assert.True(Directory.Exists(parsed.OutputDirectory), "Timestamped directory should exist");
+            
+            // Cleanup the timestamped directory
+            _cleanupPaths.Add(parsed.OutputDirectory);
         });
     }
 
@@ -386,6 +412,142 @@ public class ArgumentInterpretingTests : IDisposable
             Assert.True(Directory.Exists(nestedDir), "Nested output directory should have been created");
         });
     }
+
+    [Fact]
+    public void InterpretArguments_OutputDirectoryExists_TimestampFormatIsCorrect()
+    {
+        // Arrange
+        var existingDir = Path.Combine(Path.GetTempPath(), $"existing_{Guid.NewGuid()}");
+        Directory.CreateDirectory(existingDir);
+        _cleanupPaths.Add(existingDir);
+
+        var lookup = new Dictionary<string, string>
+        {
+            ["in"] = _testInputDir,
+            ["out"] = existingDir
+        };
+
+        // Act
+        var beforeTime = DateTime.Now;
+        var result = ArgumentInterpreting.InterpretArguments(lookup);
+        var afterTime = DateTime.Now;
+
+        // Assert
+        Assert.True(result.IsRight);
+        result.IfRight(parsed =>
+        {
+            // Extract the timestamp part
+            var timestampStr = parsed.OutputDirectory.Substring(existingDir.Length);
+            Assert.Matches(@"^\d{14}$", timestampStr); // Format: yyyyMMddHHmmss
+            
+            // Verify the timestamp is within the expected time range
+            var timestamp = DateTime.ParseExact(timestampStr, "yyyyMMddHHmmss", null);
+            Assert.True(timestamp >= beforeTime.AddSeconds(-1) && timestamp <= afterTime.AddSeconds(1));
+            
+            _cleanupPaths.Add(parsed.OutputDirectory);
+        });
+    }
+
+    [Fact]
+    public void InterpretArguments_MultipleCallsWithSameExistingDir_CreatesDifferentTimestamps()
+    {
+        // Arrange
+        var existingDir = Path.Combine(Path.GetTempPath(), $"multi_existing_{Guid.NewGuid()}");
+        Directory.CreateDirectory(existingDir);
+        _cleanupPaths.Add(existingDir);
+
+        var lookup = new Dictionary<string, string>
+        {
+            ["in"] = _testInputDir,
+            ["out"] = existingDir
+        };
+
+        // Act
+        var result1 = ArgumentInterpreting.InterpretArguments(lookup);
+        Thread.Sleep(1100); // Wait more than 1 second to ensure different timestamps
+        var result2 = ArgumentInterpreting.InterpretArguments(lookup);
+
+        // Assert
+        Assert.True(result1.IsRight);
+        Assert.True(result2.IsRight);
+        
+        string? dir1 = null;
+        string? dir2 = null;
+        
+        result1.IfRight(parsed => dir1 = parsed.OutputDirectory);
+        result2.IfRight(parsed => dir2 = parsed.OutputDirectory);
+
+        Assert.NotNull(dir1);
+        Assert.NotNull(dir2);
+        Assert.NotEqual(dir1, dir2);
+        Assert.True(Directory.Exists(dir1));
+        Assert.True(Directory.Exists(dir2));
+        
+        _cleanupPaths.Add(dir1);
+        _cleanupPaths.Add(dir2);
+    }
+
+    [Fact]
+    public void InterpretArguments_NonExistentOutputDirectory_UsesExactPath()
+    {
+        // Arrange
+        var nonExistentDir = Path.Combine(Path.GetTempPath(), $"brand_new_{Guid.NewGuid()}");
+        _cleanupPaths.Add(nonExistentDir);
+        
+        var lookup = new Dictionary<string, string>
+        {
+            ["in"] = _testInputDir,
+            ["out"] = nonExistentDir
+        };
+
+        // Verify directory doesn't exist
+        Assert.False(Directory.Exists(nonExistentDir));
+
+        // Act
+        var result = ArgumentInterpreting.InterpretArguments(lookup);
+
+        // Assert
+        Assert.True(result.IsRight);
+        result.IfRight(parsed =>
+        {
+            // Should use the exact path, not create a timestamped version
+            Assert.Equal(nonExistentDir, parsed.OutputDirectory);
+            Assert.True(Directory.Exists(nonExistentDir));
+            // Ensure no timestamp was added
+            Assert.DoesNotMatch(@"\d{14}$", parsed.OutputDirectory);
+        });
+    }
+
+    [Fact]
+    public void InterpretArguments_ExistingDirWithTrailingSlash_HandlesCorrectly()
+    {
+        // Arrange
+        var existingDir = Path.Combine(Path.GetTempPath(), $"trailing_slash_{Guid.NewGuid()}");
+        Directory.CreateDirectory(existingDir);
+        _cleanupPaths.Add(existingDir);
+
+        var dirWithSlash = existingDir + Path.DirectorySeparatorChar;
+        var lookup = new Dictionary<string, string>
+        {
+            ["in"] = _testInputDir,
+            ["out"] = dirWithSlash
+        };
+
+        // Act
+        var result = ArgumentInterpreting.InterpretArguments(lookup);
+
+        // Assert
+        Assert.True(result.IsRight);
+        result.IfRight(parsed =>
+        {
+            // Should handle trailing slash and create timestamped directory
+            Assert.StartsWith(existingDir, parsed.OutputDirectory);
+            Assert.True(Directory.Exists(parsed.OutputDirectory));
+            
+            _cleanupPaths.Add(parsed.OutputDirectory);
+        });
+    }
 }
+
 
 
