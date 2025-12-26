@@ -43,6 +43,13 @@ All command-line arguments are optional with sensible defaults:
 ### Prerequisites
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (preview)
 
+### Dependencies
+This project uses the following third-party libraries:
+- **[LanguageExt.Core](https://github.com/louthy/language-ext)** (v4.4.9) - Functional programming library for C# (MIT License)
+- **[fo-dicom](https://github.com/fo-dicom/fo-dicom)** (v5.2.5) - DICOM library for .NET (MS-PL License)
+
+Third-party licenses can be found in the [LICENSES](./LICENSES) directory.
+
 ### Build and Test
 ```bash
 # Restore dependencies
